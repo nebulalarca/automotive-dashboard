@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Automotive Fault & Repair Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:      #F8F7FF;
+      --bg2:     #FFFFFF;
+      --bg3:     #F0EEF8;
+      --surface: #FFFFFF;
+      --border:  rgba(99,82,155,.12);
+      --text:    #1E1B3A;
+      --muted:   #7B7599;
+
+      --red:     #E03E3E;
+      --green:   #2D9B6F;
+      --blue:    #2C4FA3;
+      --lila:    #8B6FC1;
+      --navy:    #1E2D6B;
+      --bej:     #C9B99A;
+      --white:   #FFFFFF;
+
+      --radius:    14px;
+      --radius-sm: 9px;
+      --font:   'Space Grotesk', sans-serif;
+      --mono:   'JetBrains Mono', monospace;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Navbar ── */
+    .navbar {
+      background: var(--navy);
+      padding: 14px 32px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .navbar-left { display: flex; align-items: center; gap: 14px; }
+    .logo {
+      background: var(--lila);
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      padding: 5px 14px;
+      border-radius: 20px;
+      text-transform: uppercase;
+    }
+    .navbar h1 { font-size: 17px; font-weight: 600; color: #fff; }
+    .navbar-right { display: flex; align-items: center; gap: 10px; }
+
+    select, .btn {
+      font-family: var(--font);
+      font-size: 12px;
+      padding: 7px 14px;
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,.2);
+      background: rgba(255,255,255,.1);
+      color: #fff;
+      cursor: pointer;
+    }
+    .btn-accent {
+      background: var(--lila);
+      border-color: var(--lila);
+      color: #fff;
+      font-weight: 600;
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 0 3px rgba(45,155,111,.3); }
+      50%      { box-shadow: 0 0 0 6px rgba(45,155,111,.1); }
+    }
+    .live-label { font-size: 11px; color: #a8f0d4; font-weight: 600; }
+
+    /* ── Layout ── */
+    .dash { padding: 24px 32px 48px; max-width: 1600px; margin: 0 auto; }
+
+    .section-title {
+      font-size: 11px; font-weight: 700;
+      color: var(--navy);
+      letter-spacing: 1.4px;
+      text-transform: uppercase;
+      margin: 28px 0 12px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-title::after {
+      content: ''; flex: 1; height: 1px;
+      background: linear-gradient(to right, var(--lila), transparent);
+    }
+
+    /* ── KPI Grid ── */
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+      gap: 10px;
+    }
+    .kpi {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 18px;
+      position: relative;
+      overflow: hidden;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .kpi:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(99,82,155,.1); }
+    .kpi-label { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: .8px; text-transform: uppercase; margin-bottom: 8px; }
+    .kpi-val   { font-size: 24px; font-weight: 700; color: var(--navy); line-height: 1; }
+    .kpi-delta { font-size: 11px; margin-top: 5px; }
+    .kpi-bar   { position: absolute; bottom: 0; left: 0; height: 3px; }
+    .delta-up   { color: var(--red); }
+    .delta-good { color: var(--green); }
+    .delta-neu  { color: var(--muted); }
+
+    /* ── Cards ── */
+    .card {
+      background: var(--white);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 2px 12px rgba(99,82,155,.06);
+    }
+    .card-title {
+      font-size: 12px; font-weight: 700;
+      color: var(--navy);
+      letter-spacing: .5px;
+      text-transform: uppercase;
+      margin-bottom: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    /* ── Grid Layouts ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+    .chart-wrap { position: relative; width: 100%; }
+
+    /* ── Legend ── */
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 11px; color: var(--muted); }
+    .legend span { display: flex; align-items: center; gap: 5px; }
+    .leg-sq { width: 10px; height: 10px; border-radius: 2px; }
+
+    /* ── Brand Bars ── */
+    .brand-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; font-size: 12px; }
+    .brand-name { min-width: 80px; color: var(--text); font-weight: 600; }
+    .brand-bar-bg { flex: 1; height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+    .brand-bar-fill { height: 100%; border-radius: 4px; transition: width .7s ease; }
+    .brand-val  { min-width: 32px; text-align: right; color: var(--muted); font-family: var(--mono); font-size: 11px; }
+    .brand-rate { min-width: 40px; text-align: right; font-size: 10px; font-weight: 600; }
+
+    /* ── Part Cards ── */
+    .part-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .part-card {
+      border-radius: var(--radius-sm);
+      padding: 12px;
+      border: 1px solid var(--border);
+      transition: transform .15s;
+    }
+    .part-card:hover { transform: scale(1.02); }
+    .part-icon  { font-size: 20px; margin-bottom: 6px; }
+    .part-name  { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 3px; }
+    .part-count { font-size: 20px; font-weight: 700; }
+    .part-pct   { font-size: 10px; margin-top: 2px; }
+
+    /* ── Automation ── */
+    .auto-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--border);
+      margin-bottom: 6px; font-size: 12px;
+      transition: box-shadow .2s;
+    }
+    .auto-item:hover { box-shadow: 0 4px 12px rgba(99,82,155,.1); }
+    .auto-name  { flex: 1; font-weight: 600; color: var(--text); }
+    .auto-count { font-family: var(--mono); font-size: 11px; color: var(--muted); }
+    .badge { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 12px; letter-spacing: .5px; }
+    .badge-crit { background: #FDEAEA; color: var(--red); }
+    .badge-warn { background: #FEF4E4; color: #C47A1A; }
+    .badge-info { background: #E8EDF8; color: var(--blue); }
+
+    /* ── Alarms ── */
+    .alarm-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 0;
+      border-bottom: 1px solid var(--border);
+      font-size: 12px;
+    }
+    .alarm-row:last-child { border-bottom: none; }
+    .alarm-dot   { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .alarm-brand { font-weight: 700; min-width: 90px; color: var(--navy); }
+    .alarm-msg   { flex: 1; color: var(--muted); }
+    .alarm-time  { font-family: var(--mono); font-size: 10px; color: var(--muted); }
+
+    /* ── Table ── */
+    .tabs { display: flex; gap: 4px; }
+    .tab {
+      font-family: var(--font); font-size: 11px; font-weight: 600;
+      padding: 5px 14px; border-radius: 20px;
+      border: 1px solid var(--border);
+      background: transparent; color: var(--muted); cursor: pointer;
+      transition: all .2s;
+    }
+    .tab.active { background: var(--lila); border-color: var(--lila); color: #fff; }
+
+    .tbl-wrap { overflow-x: auto; margin-top: 4px; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    thead th {
+      font-size: 10px; font-weight: 700; color: var(--muted);
+      letter-spacing: .7px; text-transform: uppercase;
+      padding: 8px 10px; text-align: left;
+      border-bottom: 2px solid var(--bg3);
+    }
+    tbody td { padding: 10px; border-bottom: 1px solid var(--bg3); color: var(--text); }
+    tbody tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: var(--bg3); }
+    .mono { font-family: var(--mono); font-size: 11px; }
+
+    .score-pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 12px; }
+    .score-a { background: #E2F5ED; color: #1A7A4A; }
+    .score-b { background: #FEF4E4; color: #C47A1A; }
+    .score-c { background: #FDEAEA; color: var(--red); }
+    .seg-pill { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 10px; }
+    .seg-premium { background: #EDE8F8; color: var(--lila); }
+    .seg-mid     { background: #E8EDF8; color: var(--blue); }
+
+    /* ── Cat Legend ── */
+    .cat-layout { display: flex; align-items: center; gap: 16px; }
+    .cat-legend { display: flex; flex-direction: column; gap: 7px; font-size: 11px; color: var(--muted); min-width: 120px; }
+    .cat-legend span { display: flex; align-items: center; gap: 6px; }
+    .cat-legend strong { color: var(--text); margin-left: auto; font-family: var(--mono); }
+
+    /* ── Loader ── */
+    #loader {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(248,247,255,.8);
+      z-index: 999;
+      align-items: center; justify-content: center;
+      font-size: 14px; font-weight: 600; color: var(--lila);
+    }
+
+    /* ── Footer ── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 16px 0 0;
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 10px; margin-top: 20px;
+    }
+    .footer-meta { font-size: 11px; color: var(--muted); }
+    .footer-meta strong { color: var(--navy); }
+    .btn-gh {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: var(--navy); color: #fff;
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      padding: 9px 18px; border-radius: var(--radius-sm);
+      cursor: pointer; border: none; text-decoration: none;
+    }
+    .btn-li {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: #0A66C2; color: #fff;
+      font-family: var(--font); font-size: 12px; font-weight: 600;
+      padding: 9px 18px; border-radius: var(--radius-sm);
+      cursor: pointer; border: none;
+    }
+
+    @media (max-width: 900px) {
+      .dash { padding: 16px; }
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="loader">⏳ Veriler yükleniyor...</div>
+
+<nav class="navbar">
+  <div class="navbar-left">
+    <span class="logo">Auto Analytics</span>
+    <h1>Arıza &amp; Tamir Dashboard</h1>
+  </div>
+  <div class="navbar-right">
+    <div class="live-dot"></div>
+    <span class="live-label">CANLI</span>
+    <select id="yearSel" onchange="onFilterChange()">
+      <option>2024</option><option>2023</option><option>2022</option>
+    </select>
+    <select id="brandSel" onchange="onFilterChange()">
+      <option value="all">Tüm Markalar</option>
+      <option>BMW</option><option>Mercedes</option><option>Toyota</option>
+      <option>Volkswagen</option><option>Ford</option><option>Honda</option>
+      <option>Audi</option><option>Hyundai</option>
+    </select>
+    <button class="btn btn-accent" onclick="refreshDashboard()">⟳ Yenile</button>
+  </div>
+</nav>
+
+<main class="dash">
+
+  <div class="section-title">Genel Göstergeler</div>
+  <div class="kpi-grid" id="kpiGrid"></div>
+
+  <div class="section-title">Zaman Serisi & Kategori Analizi</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <span>📈 Aylık Arıza & Tamir Trendi</span>
+        <div class="legend">
+          <span><span class="leg-sq" style="background:#E03E3E"></span>Arıza</span>
+          <span><span class="leg-sq" style="background:#2D9B6F"></span>Tamir</span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:230px">
+        <canvas id="trendChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🍩 Hata Kategorisi Dağılımı</span></div>
+      <div class="cat-layout">
+        <div class="chart-wrap" style="height:210px;flex:1">
+          <canvas id="catChart"></canvas>
+        </div>
+        <div class="cat-legend" id="catLegend"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Marka, Parça & Otomasyon Analizi</div>
+  <div class="grid-3">
+    <div class="card">
+      <div class="card-title"><span>🚗 Marka Bazlı Arıza Sayısı</span></div>
+      <div id="brandBars"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🔩 Parça Kaynaklı Hata Dağılımı</span></div>
+      <div class="part-grid" id="partGrid"></div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🤖 Otomasyon Sistemi Kaynakları</span></div>
+      <div id="autoList"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Maliyet Analizi & Kritik Alarmlar</div>
+  <div class="grid-2">
+    <div class="card">
+      <div class="card-title">
+        <span>💰 Tamir Süresi & Maliyet</span>
+        <div class="legend">
+          <span><span class="leg-sq" style="background:#8B6FC1"></span>Süre</span>
+          <span><span class="leg-sq" style="background:#E03E3E"></span>Maliyet</span>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:230px">
+        <canvas id="costChart"></canvas>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title"><span>🚨 Kritik Arıza Alarmları</span></div>
+      <div id="alarmList"></div>
+    </div>
+  </div>
+
+  <div class="section-title">Model Bazlı Performans & MTBF</div>
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title">
+      <span>📋 Model Performans Tablosu</span>
+      <div class="tabs">
+        <button class="tab active" onclick="switchTab(this,'all')">Tümü</button>
+        <button class="tab" onclick="switchTab(this,'Premium')">Premium</button>
+        <button class="tab" onclick="switchTab(this,'Orta')">Orta Segment</button>
+      </div>
+    </div>
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Marka / Model</th><th>Segment</th><th>Toplam Arıza</th>
+            <th>Tamir Oranı</th><th>Ort. Tamir</th><th>MTBF</th>
+            <th>Maliyet</th><th>Skor</th>
+          </tr>
+        </thead>
+        <tbody id="modelTbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card" style="margin-bottom:12px">
+    <div class="card-title"><span>📊 MTBF Sıralaması (Ortalama Arıza Aralığı / Gün)</span></div>
+    <div class="chart-wrap" style="height:320px">
+      <canvas id="mtbfChart"></canvas>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-meta">
+      Son güncelleme: <strong id="lastUpdate">—</strong> &nbsp;·&nbsp;
+      Kaynak: <strong>Kaggle / OBD-II Telemetri</strong>
+    </div>
+    <div style="display:flex;gap:8px">
+      <a class="btn-gh" href="https://github.com" target="_blank">⬡ GitHub</a>
+      <button class="btn-li" onclick="shareLinkedIn()">in LinkedIn'de Paylaş</button>
+    </div>
+  </div>
+
+</main>
+
+<script src="data.js"></script>
+<script src="charts.js"></script>
+<script>
+
+  async function refreshDashboard() {
+    const data = await fetchAll();
+    if (!data) return;
+
+    if (data.kpis) {
+      document.getElementById("kpiGrid").innerHTML = data.kpis.map(k => `
+        <div class="kpi">
+          <div class="kpi-label">${k.label}</div>
+          <div class="kpi-val">${k.value}</div>
+          <div class="kpi-delta delta-${k.trend}">${k.delta}</div>
+          <div class="kpi-bar" style="background:${k.color};width:${k.barW}"></div>
+        </div>`).join("");
+    }
+
+    if (data.brands) {
+      const max = Math.max(...data.brands.map(b => b.faults));
+      document.getElementById("brandBars").innerHTML = data.brands.map(b => `
+        <div class="brand-row">
+          <span class="brand-name">${b.name}</span>
+          <div class="brand-bar-bg">
+            <div class="brand-bar-fill" style="background:${b.color};width:${Math.round(b.faults/max*100)}%"></div>
+          </div>
+          <span class="brand-val">${b.faults}</span>
+          <span class="brand-rate" style="color:${b.repairRate>=95?'#2D9B6F':b.repairRate>=90?'#C47A1A':'#E03E3E'}">%${b.repairRate}</span>
+        </div>`).join("");
+    }
+
+    if (data.parts) {
+      document.getElementById("partGrid").innerHTML = data.parts.map(p => `
+        <div class="part-card" style="background:${p.bg}">
+          <div class="part-icon">${p.icon}</div>
+          <div class="part-name">${p.name}</div>
+          <div class="part-count" style="color:${p.color}">${p.count}</div>
+          <div class="part-pct" style="color:${p.color}">%${p.pct} pay</div>
+        </div>`).join("");
+    }
+
+    if (data.automations) {
+      const icons  = { critical:"🔴", warning:"🟡", info:"🔵" };
+      const badges = { critical:"badge-crit", warning:"badge-warn", info:"badge-info" };
+      const labels = { critical:"KRİTİK", warning:"UYARI", info:"BİLGİ" };
+      document.getElementById("autoList").innerHTML = data.automations.map(a => `
+        <div class="auto-item">
+          <span>${icons[a.severity]}</span>
+          <span class="auto-name">${a.name}</span>
+          <span class="auto-count">${a.count}</span>
+          <span class="badge ${badges[a.severity]}">${labels[a.severity]}</span>
+        </div>`).join("");
+    }
+
+    if (data.alarms) {
+      const badges = { critical:"badge-crit", warning:"badge-warn", info:"badge-info" };
+      const labels = { critical:"KRİTİK", warning:"UYARI", info:"BİLGİ" };
+      document.getElementById("alarmList").innerHTML = data.alarms.map(a => `
+        <div class="alarm-row">
+          <div class="alarm-dot" style="background:${a.color}"></div>
+          <span class="alarm-brand">${a.brand}</span>
+          <span class="alarm-msg">${a.msg}</span>
+          <span class="alarm-time">${a.time}</span>
+          <span class="badge ${badges[a.severity]}">${labels[a.severity]}</span>
+        </div>`).join("");
+    }
+
+    if (data.models) buildModelTable("all", data.models);
+    if (data.trend)      buildTrendChart(data.trend);
+    if (data.categories) buildCategoryChart(data.categories);
+    if (data.repairCost) buildCostChart(data.repairCost);
+    if (data.models)     buildMtbfChart(data.models);
+
+    document.getElementById("lastUpdate").textContent =
+      new Date().toLocaleString("tr-TR");
+  }
+
+  function buildModelTable(filter, rows) {
+    const filtered = filter === "all" ? rows : rows.filter(m => m.seg === filter);
+    const score = m => {
+      if (m.mtbf > 70 && m.repair > 95) return ["score-a", "A — Mükemmel"];
+      if (m.mtbf > 50 && m.repair > 90) return ["score-b", "B — İyi"];
+      return ["score-c", "C — Gelişmeli"];
+    };
+    document.getElementById("modelTbody").innerHTML = filtered.map(m => {
+      const [sc, sl] = score(m);
+      return `<tr>
+        <td><strong>${m.brand}</strong> ${m.model}</td>
+        <td><span class="seg-pill ${m.seg==='Premium'?'seg-premium':'seg-mid'}">${m.seg}</span></td>
+        <td class="mono">${m.faults}</td>
+        <td class="mono">%${m.repair}</td>
+        <td class="mono">${m.hrs} sa</td>
+        <td class="mono">${m.mtbf} gün</td>
+        <td class="mono">₺${m.cost.toLocaleString("tr-TR")}</td>
+        <td><span class="score-pill ${sc}">${sl}</span></td>
+      </tr>`;
+    }).join("");
+  }
+
+  function switchTab(el, filter) {
+    document.querySelectorAll(".tab").forEach(t => t.classList.remove("active"));
+    el.classList.add("active");
+    apiFetch(`models?segment=${filter}`).then(rows => buildModelTable(filter, rows || []));
+  }
+
+  function onFilterChange() {
+    const year  = document.getElementById("yearSel").value;
+    const brand = document.getElementById("brandSel").value;
+    updateFilters(year, brand);
+  }
+
+  function shareLinkedIn() {
+    const url = "https://www.linkedin.com/shareArticle?mini=true" +
+      "&url=https://github.com" +
+      "&title=Automotive+Fault+%26+Repair+Dashboard" +
+      "&summary=" + encodeURIComponent(
+        "Automotive Fault & Repair Analytics Dashboard — " +
+        "OBD-II telemetri, MTBF analizi, parça kaynaklı hata takibi. " +
+        "#Automotive #DataAnalytics #Dashboard"
+      );
+    window.open(url, "_blank", "width=600,height=500");
+  }
+
+  document.addEventListener("DOMContentLoaded", () => {
+    refreshDashboard();
+  });
+
+</script>
+</body>
+</html>
+
+
